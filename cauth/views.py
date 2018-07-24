@@ -1,18 +1,19 @@
-from rest_framework import generics, viewsets, renderers
-from .models import User
-from .serializers import UserSerializer, UserEasySerializer
-from .filters import UserFilter
-from rest_framework.response import Response
 import django_filters
-from exlib.rest_framework.pagination import PageCodePagination
-from rest_framework.viewsets import mixins
+from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.shortcuts import get_object_or_404
+from django.http.response import HttpResponse
+from rest_framework import generics, viewsets, renderers
+from rest_framework.response import Response
+from rest_framework.viewsets import mixins
 from rest_framework.decorators import action, permission_classes, api_view
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import login as auth_login, logout as auth_logout
+from exlib.rest_framework.pagination import PageCodePagination
+from .models import User
+from .serializers import UserSerializer, UserEasySerializer, AuthenticationSerializer
+from .filters import UserFilter
+
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -33,21 +34,25 @@ class UserViewSet(viewsets.ModelViewSet):
     #         return Response({'success': False, 'req payload': request.data, 'messages': errors}, status=400)
     #     request.user.send_email(**form.cleaned_data)
     #     return Response({'success': True})
-    #
-    # @action(detail=False, methods=['post'])
-    # def info(self, request):
-    #     return Response(UserSerializer(request.user).data)
+
+    @action(detail=False, methods=['post'])
+    def info(self, request):
+        return Response(UserSerializer(request.user).data)
 
 
-class LoginView(APIView):
+class LoginView(generics.GenericAPIView, mixins.CreateModelMixin):
+    serializer_class = AuthenticationSerializer
+
+    def get(self, request, format=None):
+        return HttpResponse('this is a login page')
+
     def post(self, request, format=None):
-        form = AuthenticationForm(request, data=request.data)
+        form = AuthenticationSerializer(instance=None, data=request.data, request=request)
         if form.is_valid():
-            auth_login(self.request, form.get_user())
+            auth_login(self.request, form.user)
             return Response({'success': True})
         else:
-            errors = {e: v.as_text() for e, v in form.errors.items()}
-            return Response({'success': False, 'req payload': request.data, 'messages': errors}, status=400)
+            return Response({'success': False, 'req payload': request.data, 'messages': form.errors}, status=400)
 
 
 @api_view(["GET"])
